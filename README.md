@@ -159,14 +159,14 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
 
 | Vrstva | Technológia |
 |---|---|
-| Backend | ASP.NET Core 8, C# 12 |
-| ORM | Entity Framework Core 8 |
+| Backend | Python 3.11+, FastAPI |
+| ORM | SQLAlchemy 2.0 (async) |
 | Databáza | SQLite (dev) → PostgreSQL (prod) |
 | Autentifikácia | OAuth 2.0 (Erste / ČS API) |
-| Frontend dashboard | Blazor Server |
-| Dokumentácia API | Swagger / OpenAPI 3.1 |
+| HTTP klient | httpx (async) |
+| Dokumentácia API | Swagger / OpenAPI 3.1 (auto-generated) |
 | Kontajnerizácia | Docker + docker-compose |
-| Logy | Serilog |
+| Šifrovanie | cryptography (Fernet / AES) |
 
 ---
 
@@ -174,7 +174,7 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
 
 ### Predpoklady
 
-- .NET 8 SDK
+- Python 3.11+
 - Účet na [Erste Developer Portal](https://developers.erstegroup.com)
 - Registrovaná aplikácia ako **Final API Consumer**
 
@@ -184,16 +184,19 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
 git clone https://github.com/<tvoj-username>/cs-banking-agent
 cd cs-banking-agent
 cp .env.example .env
-# Vyplň CLIENT_ID, CLIENT_SECRET, REDIRECT_URI v .env
-dotnet restore
-dotnet ef database update --project src/CsBankingApp.Api
-dotnet run --project src/CsBankingApp.Api
+# Vyplň CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, TOKEN_ENCRYPTION_KEY v .env
+pip install -r requirements.txt
+python -m uvicorn src.app.main:app --reload
 ```
 
 ### Autorizácia
 
-Otvor `http://localhost:5000/auth/login` — presmeruje ťa na Erste OAuth consent screen.
+Otvor `http://localhost:8000/auth/login` — presmeruje ťa na Erste OAuth consent screen.
 Po schválení sa token uloží a aplikácia začne sťahovať transakcie.
+
+### API dokumentácia
+
+Swagger UI: `http://localhost:8000/docs`
 
 ---
 
@@ -283,32 +286,29 @@ SYNC_INTERVAL_MINUTES=15
 ```
 cs-banking-agent/
 ├── src/
-│   ├── CsBankingApp.Api/
-│   │   ├── Controllers/
-│   │   │   ├── AgentController.cs
-│   │   │   ├── TransactionsController.cs
-│   │   │   ├── PaymentsController.cs
-│   │   │   └── AuthController.cs
-│   │   ├── Program.cs
-│   │   └── appsettings.json
-│   │
-│   └── CsBankingApp.Core/
-│       ├── Models/
-│       │   ├── Transaction.cs
-│       │   ├── Document.cs
-│       │   └── Payment.cs
-│       ├── Services/
-│       │   ├── ErsteApiClient.cs
-│       │   ├── TransactionService.cs
-│       │   ├── MatchingService.cs
-│       │   └── PaymentService.cs
-│       └── Data/
-│           └── BankingDbContext.cs
+│   └── app/
+│       ├── main.py                  # FastAPI application entry point
+│       ├── core/
+│       │   ├── config.py            # Settings (pydantic-settings, .env)
+│       │   ├── database.py          # SQLAlchemy async engine & session
+│       │   └── encryption.py        # Fernet token encryption
+│       ├── models/
+│       │   ├── account.py           # Account model
+│       │   ├── transaction.py       # Transaction model
+│       │   └── token.py             # OAuth token model
+│       ├── services/
+│       │   ├── erste_client.py      # Erste/ČS API HTTP client
+│       │   ├── token_service.py     # Token storage & auto-refresh
+│       │   └── transaction_service.py  # Sync & local CRUD
+│       └── api/
+│           └── routes/
+│               ├── auth.py          # OAuth login/callback
+│               └── accounts.py      # /api/accounts endpoints
 │
 ├── tests/
-│   └── CsBankingApp.Tests/
-├── docker-compose.yml
+├── requirements.txt
 ├── .env.example
+├── .gitignore
 └── README.md
 ```
 
