@@ -1,12 +1,12 @@
 # qnaccounting
 
-# 🏦 CS Banking Agent — Inteligentný systém na spracovanie bankových transakcií
+# CS Banking Agent — Inteligentný systém na spracovanie bankových transakcií
 
 > Webový server + REST API pre AI agenta, ktorý automaticky páruje bankové transakcie s faktúrami a dokladmi pomocou Česká spořitelna API.
 
 ---
 
-## 📋 Obsah
+## Obsah
 
 - [Popis projektu](#popis-projektu)
 - [Architektúra](#architektúra)
@@ -19,7 +19,7 @@
 
 ---
 
-## 📌 Popis projektu
+## Popis projektu
 
 Systém slúži na automatizované spracovanie bankových transakcií z **Česká spořitelna** (cez Erste Developer Portal API). Hlavnou úlohou je umožniť AI agentovi:
 
@@ -33,7 +33,7 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
 
 ---
 
-## 🏗️ Architektúra
+## Architektúra
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -44,19 +44,19 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │              CS Banking Agent — API Server               │
-│                    (ASP.NET Core 8)                      │
+│                  (Python / FastAPI)                       │
 │                                                          │
 │  ┌─────────────────┐    ┌────────────────────────────┐  │
-│  │  Agent API      │    │  Web Dashboard (Blazor /   │  │
-│  │  /api/agent/*   │    │  React frontend)            │  │
+│  │  Agent API      │    │  Web Dashboard             │  │
+│  │  /api/agent/*   │    │  (budúca fáza)             │  │
 │  └────────┬────────┘    └────────────────────────────┘  │
 │           │                                              │
 │  ┌────────▼────────────────────────────────────────┐    │
 │  │              Business Logic Layer                │    │
 │  │  - TransactionService                            │    │
-│  │  - MatchingService (párovanie VS/SS/suma)        │    │
-│  │  - PaymentService                                │    │
-│  │  - DocumentService                               │    │
+│  │  - TokenService (OAuth2 + auto-refresh)          │    │
+│  │  - ErsteApiClient                                │    │
+│  │  - EncryptionService (Fernet / AES)              │    │
 │  └────────┬────────────────────────────────────────┘    │
 │           │                                              │
 │  ┌────────▼──────────┐    ┌────────────────────────┐    │
@@ -74,26 +74,32 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
 
 ---
 
-## 🚀 Fázy vývoja
+## Fázy vývoja
 
-### Fáza 1 — Základ & autentifikácia *(Core foundation)*
+### Fáza 1 — Základ & autentifikácia *(Core foundation)* ✅ DOKONČENÁ
+
 **Cieľ:** Funkčné pripojenie na ČS API, uloženie tokenov, sandbox prostredie
 
-- [ ] Inicializácia projektu (ASP.NET Core 8, EF Core, SQLite)
-- [ ] OAuth 2.0 flow s Erste Developer Portal (authorization code grant)
-- [ ] Bezpečné uloženie a automatická obnova access/refresh tokenov
-- [ ] `GET /api/accounts` — zoznam účtov
-- [ ] `GET /api/accounts/{id}/transactions` — stiahnutie transakcií
-- [ ] Lokálna databáza — tabuľky `Transactions`, `Accounts`, `Tokens`
-- [ ] Sandbox testovanie + .env konfigurácia
+- [x] Inicializácia projektu (Python 3.11+, FastAPI, SQLAlchemy async, SQLite)
+- [x] OAuth 2.0 flow s Erste Developer Portal (authorization code grant)
+- [x] Bezpečné uloženie a automatická obnova access/refresh tokenov (Fernet šifrovanie)
+- [x] `GET /api/accounts` — zoznam účtov (s voliteľným live sync)
+- [x] `GET /api/accounts/{id}/transactions` — stiahnutie transakcií (s filtrovaním podľa dátumu)
+- [x] Lokálna databáza — tabuľky `accounts`, `transactions`, `oauth_tokens`
+- [x] `GET /health` — health check endpoint
+- [x] `GET /auth/login` — OAuth redirect na Erste consent screen
+- [x] `GET /auth/callback` — spracovanie OAuth callback, uloženie tokenov
+- [x] `GET /auth/status` — kontrola platnosti tokenu
+- [x] `.env` konfigurácia cez pydantic-settings
+- [x] `.gitignore` a `.env.example` šablóna
 
 ---
 
 ### Fáza 2 — Správa dokladov & párovanie *(Document matching)*
 **Cieľ:** Systém na nahrávanie faktúr a ich párovanie s transakciami
 
-- [ ] Tabuľka `Documents` (faktúry, doklady) — upload PDF/obrázok
-- [ ] Tabuľka `TransactionDocumentLinks` — M:N prepojenie
+- [ ] Model `Document` (faktúry, doklady) — upload PDF/obrázok
+- [ ] Model `TransactionDocumentLink` — M:N prepojenie transakcií a dokladov
 - [ ] Manuálne párovanie cez API (`POST /api/match`)
 - [ ] Automatické párovanie podľa:
   - Variabilný symbol (VS)
@@ -102,6 +108,7 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
   - Dátum (±3 dni)
 - [ ] Stavy transakcií: `Unmatched` | `Matched` | `Ignored` | `ManuallyMatched`
 - [ ] `PATCH /api/transactions/{id}/mark` — agent môže označiť transakciu
+- [ ] Alembic migrácie pre nové tabuľky
 
 ---
 
@@ -150,27 +157,32 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
 - [ ] Rate limiting na Agent API
 - [ ] Audit log — kto/čo zmenil transakciu
 - [ ] Docker + docker-compose
-- [ ] Health check endpoint `/health`
-- [ ] Základný monitoring (Serilog + Seq)
+- [ ] Health check endpoint `/health` *(už implementované v Fáze 1)*
+- [ ] Monitoring a logovanie (structlog / Loguru)
+- [ ] Testy (unit + integration)
 
 ---
 
-## 🛠️ Technológie
+## Technológie
 
 | Vrstva | Technológia |
 |---|---|
-| Backend | Python 3.11+, FastAPI |
+| Backend | Python 3.11+, FastAPI 0.115+ |
+| ASGI server | Uvicorn 0.34+ |
 | ORM | SQLAlchemy 2.0 (async) |
+| DB driver | aiosqlite (dev) |
 | Databáza | SQLite (dev) → PostgreSQL (prod) |
 | Autentifikácia | OAuth 2.0 (Erste / ČS API) |
 | HTTP klient | httpx (async) |
-| Dokumentácia API | Swagger / OpenAPI 3.1 (auto-generated) |
-| Kontajnerizácia | Docker + docker-compose |
-| Šifrovanie | cryptography (Fernet / AES) |
+| Konfigurácia | pydantic-settings + python-dotenv |
+| Dokumentácia API | Swagger / OpenAPI 3.1 (auto-generated by FastAPI) |
+| Šifrovanie | cryptography (Fernet) |
+| Migrácie | Alembic 1.14+ |
+| Kontajnerizácia | Docker + docker-compose *(plánované)* |
 
 ---
 
-## ⚡ Rýchly štart
+## Rýchly štart
 
 ### Predpoklady
 
@@ -181,8 +193,11 @@ Systém je navrhnutý ako **API-first** — primárnym konzumentom je AI agent (
 ### Inštalácia
 
 ```bash
-git clone https://github.com/<tvoj-username>/cs-banking-agent
-cd cs-banking-agent
+git clone https://github.com/<tvoj-username>/qnaccounting
+cd qnaccounting
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
 cp .env.example .env
 # Vyplň CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, TOKEN_ENCRYPTION_KEY v .env
 pip install -r requirements.txt
@@ -192,24 +207,54 @@ python -m uvicorn src.app.main:app --reload
 ### Autorizácia
 
 Otvor `http://localhost:8000/auth/login` — presmeruje ťa na Erste OAuth consent screen.
-Po schválení sa token uloží a aplikácia začne sťahovať transakcie.
+Po schválení sa token uloží (šifrovaný) a aplikácia začne sťahovať transakcie.
+
+### Overenie stavu
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Status autentifikácie
+curl http://localhost:8000/auth/status
+
+# Zoznam účtov (po autorizácii)
+curl http://localhost:8000/api/accounts
+
+# Transakcie pre účet
+curl "http://localhost:8000/api/accounts/{id}/transactions?date_from=2024-01-01&date_to=2024-12-31"
+```
 
 ### API dokumentácia
 
 Swagger UI: `http://localhost:8000/docs`
+ReDoc: `http://localhost:8000/redoc`
 
 ---
 
-## 📡 API pre AI agenta
+## Aktuálne API endpointy (Fáza 1)
 
-Agentské endpointy sú navrhnuté ako **tool definitions** pre LLM s function calling / tool use.
+| Metóda | Endpoint | Popis |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `GET` | `/auth/login` | OAuth redirect na Erste consent screen |
+| `GET` | `/auth/callback` | OAuth callback handler |
+| `GET` | `/auth/status` | Kontrola platnosti tokenu |
+| `GET` | `/api/accounts` | Zoznam účtov (`?sync=true` pre live sync) |
+| `GET` | `/api/accounts/{id}/transactions` | Transakcie účtu (filtre: `date_from`, `date_to`, `?sync=true`) |
+
+---
+
+## API pre AI agenta *(plánované — Fáza 3)*
+
+Agentské endpointy budú navrhnuté ako **tool definitions** pre LLM s function calling / tool use.
 
 ### Autentifikácia
 ```
 Authorization: Bearer <AGENT_API_KEY>
 ```
 
-### Kľúčové endpointy
+### Plánované endpointy
 
 | Metóda | Endpoint | Popis |
 |---|---|---|
@@ -248,7 +293,7 @@ POST /api/agent/payments
 
 ---
 
-## ⚙️ Konfigurácia
+## Konfigurácia
 
 `.env.example`:
 
@@ -256,56 +301,65 @@ POST /api/agent/payments
 # Erste / ČS API
 ERSTE_CLIENT_ID=your_client_id
 ERSTE_CLIENT_SECRET=your_client_secret
-ERSTE_REDIRECT_URI=http://localhost:5000/auth/callback
+ERSTE_REDIRECT_URI=http://localhost:8000/auth/callback
 ERSTE_SANDBOX=true
+ERSTE_API_BASE_URL=https://webapi.developers.erstegroup.com/api/csas/sandbox/v2
 
 # Databáza
-DATABASE_URL=Data Source=banking.db
+DATABASE_URL=sqlite+aiosqlite:///./banking.db
 
 # Agent API
 AGENT_API_KEY=your_secret_agent_key
 
 # Synchronizácia
 SYNC_INTERVAL_MINUTES=15
+
+# Šifrovanie tokenov (Fernet key)
+TOKEN_ENCRYPTION_KEY=your_fernet_key_here
 ```
 
 ---
 
-## 🔐 Bezpečnosť
+## Bezpečnosť
 
-- Bankové tokeny sú šifrované v databáze (AES-256)
+- Bankové tokeny sú šifrované v databáze (Fernet / AES-256)
 - Agent API kľúč je oddelený od bankových prihlasovacích údajov
 - Všetka komunikácia cez HTTPS
-- PSD2 SCA flow pre platobné príkazy
-- Audit log každej zmeny stavu transakcie
+- PSD2 SCA flow pre platobné príkazy *(plánované)*
+- Audit log každej zmeny stavu transakcie *(plánované)*
 
 ---
 
-## 📁 Štruktúra projektu
+## Štruktúra projektu
 
 ```
-cs-banking-agent/
+qnaccounting/
 ├── src/
 │   └── app/
-│       ├── main.py                  # FastAPI application entry point
+│       ├── __init__.py
+│       ├── main.py                    # FastAPI entry point, lifespan, health check
 │       ├── core/
-│       │   ├── config.py            # Settings (pydantic-settings, .env)
-│       │   ├── database.py          # SQLAlchemy async engine & session
-│       │   └── encryption.py        # Fernet token encryption
+│       │   ├── __init__.py
+│       │   ├── config.py              # Pydantic settings (.env loading)
+│       │   ├── database.py            # SQLAlchemy async engine & session
+│       │   └── encryption.py          # Fernet token encryption/decryption
 │       ├── models/
-│       │   ├── account.py           # Account model
-│       │   ├── transaction.py       # Transaction model
-│       │   └── token.py             # OAuth token model
+│       │   ├── __init__.py
+│       │   ├── account.py             # Account ORM model
+│       │   ├── transaction.py         # Transaction ORM model
+│       │   └── token.py               # OAuthToken ORM model
 │       ├── services/
-│       │   ├── erste_client.py      # Erste/ČS API HTTP client
-│       │   ├── token_service.py     # Token storage & auto-refresh
-│       │   └── transaction_service.py  # Sync & local CRUD
+│       │   ├── __init__.py
+│       │   ├── erste_client.py        # Erste/ČS API HTTP client
+│       │   ├── token_service.py       # Token storage & auto-refresh
+│       │   └── transaction_service.py # Account/transaction sync & CRUD
 │       └── api/
+│           ├── __init__.py
 │           └── routes/
-│               ├── auth.py          # OAuth login/callback
-│               └── accounts.py      # /api/accounts endpoints
-│
-├── tests/
+│               ├── __init__.py
+│               ├── auth.py            # OAuth login/callback/status
+│               └── accounts.py        # /api/accounts endpoints
+├── tests/                             # Testy (plánované)
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -314,7 +368,7 @@ cs-banking-agent/
 
 ---
 
-## 🤝 Prispievanie
+## Prispievanie
 
 1. Fork repozitára
 2. Vytvor feature branch: `git checkout -b feature/nazov-funkcie`
@@ -324,6 +378,6 @@ cs-banking-agent/
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 MIT License
